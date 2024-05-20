@@ -1,0 +1,271 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID AGRILNC3.
+      ******************************************************************
+      *                    REPORT CREATION
+      *
+      * INPUT : TECN194.AGRIAP.DETAILS.KSDS
+      * OUTPUT: TECN194.AGRILN.DETAILS.REPORT
+      ******************************************************************
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+      *--------------> APPLICANT VSAM FILE <--------------------------
+           SELECT APP-KSDS ASSIGN TO APPKSDS
+           ORGANIZATION IS INDEXED
+           ACCESS MODE IS SEQUENTIAL
+           RECORD KEY IS APKSDS-APPID
+           FILE STATUS IS WS-FST-APKSDS.
+      *---------------> REPORT FILE <---------------------------------
+           SELECT OUT-PS ASSIGN TO AGRLNREP
+           ORGANIZATION IS SEQUENTIAL
+           ACCESS IS SEQUENTIAL
+           FILE STATUS IS WS-FST-OUTPS.
+       DATA DIVISION.
+       FILE SECTION.
+       FD APP-KSDS
+           RECORD VARYING IN SIZE FROM 1 TO 80.
+       01 AP-KSDS-REC.
+          02 APKSDS-APPID   PIC X(10).
+          02 FILLER         PIC X(1).
+          02 APKSDS-APPNAME PIC X(32).
+          02 FILLER         PIC X(1).
+          02 APKSDS-CELL    PIC X(10).
+          02 FILLER         PIC X(1).
+          02 APKSDS-NOOFLN  PIC X(01).
+          02 FILLER         PIC X(1).
+          02 APKSDS-LNAMT   PIC 9(07).99.
+          02 FILLER         PIC X(1).
+          02 APKSDS-LNAPDT  PIC X(10).
+       FD OUT-PS
+           RECORD CONTAINS 80 CHARACTERS.
+       01 REPORTPS          PIC X(80).
+       WORKING-STORAGE SECTION.
+       01 WS-FST-APKSDS  PIC 9(02) VALUE ZERO.
+       01 WS-FST-OUTPS   PIC 9(02) VALUE ZERO.
+       01 WS-COUNTER     PIC 9(02) VALUE ZERO.
+       01 WS-EOP         PIC X(80).
+       01 WS-EOF         PIC X(80).
+       01 WS-TITLE.
+          02 FILLER         PIC X(18).
+          02 TITNAME        PIC X(50).
+       01 EMPTY.
+          02 FILLER         PIC X(80).
+       01 WS-DATE.
+          02 WS-YY          PIC X(02).
+          02 FILLER         PIC X(01) VALUE '-'.
+          02 WS-MM          PIC X(02).
+          02 FILLER         PIC X(01) VALUE '-'.
+          02 WS-DD          PIC X(02).
+       01 DATEPG.
+          02 WS-DT          PIC X(06) VALUE 'DATE: '.
+          02 WS-YEAR        PIC X(02).
+          02 FILLER         PIC X(01) VALUE '-'.
+          02 WS-MONTH       PIC X(02).
+          02 FILLER         PIC X(01) VALUE '-'.
+          02 WS-DAY         PIC X(02).
+          02 FILLER         PIC X(32).
+          02 WS-PG          PIC X(08) VALUE 'PAGE  : '.
+          02 WS-PGNUM       PIC 9(04) VALUE 0001.
+       01 WS-TIME.
+          02 WS-HH          PIC X(02).
+          02 WS-MI          PIC X(02).
+          02 WS-SE          PIC X(02).
+       01 TIMEID.
+          02 WS-TIM         PIC X(06) VALUE 'TIME: '.
+          02 WS-HR          PIC X(02).
+          02 FILLER         PIC X(01) VALUE ':'.
+          02 WS-MIN         PIC X(02).
+          02 FILLER         PIC X(01) VALUE ':'.
+          02 WS-SEC         PIC X(02).
+          02 FILLER         PIC X(32).
+          02 WS-ID          PIC X(12) VALUE 'REP ID: 1016'.
+       01 FIELDNAME.
+          02 WS-F1          PIC X(12) VALUE 'APPLICANT_ID'.
+          02 FILLER         PIC X(02).
+          02 WS-F2          PIC X(32) VALUE 'NAME'.
+          02 FILLER         PIC X(02).
+          02 WS-F3          PIC X(15) VALUE 'NO.OF_ACT_LOANS'.
+          02 FILLER         PIC X(02).
+          02 WS-F4          PIC X(15) VALUE 'TOT_LOAN_AMOUNT'.
+       01 FIELDUND.
+          02 WS-F1          PIC X(12) VALUE '^^^^^^^^^^^^'.
+          02 FILLER         PIC X(02).
+          02 WS-F2          PIC X(32) VALUE '^^^^'.
+          02 FILLER         PIC X(02).
+          02 WS-F3          PIC X(15) VALUE '^^^^^^^^^^^^^^^'.
+          02 FILLER         PIC X(02).
+          02 WS-F4          PIC X(15) VALUE '^^^^^^^^^^^^^^^'.
+       01 WS-NEWPG.
+          02 FILLER         PIC X(46).
+          02 WS-NEWPGTIT    PIC X(08) VALUE 'PAGE  : '.
+          02 WS-NEWPGNUM    PIC 9(04) VALUE 0001.
+       01 WS-NEWREP.
+          02 FILLER         PIC X(46).
+          02 WS-NEWREPID    PIC X(12) VALUE 'REP ID: 1016'.
+       01 WS-RECORD.
+          02 WS-APPID       PIC X(12).
+          02 FILLER         PIC X(02).
+          02 WS-NAME        PIC X(32).
+          02 FILLER         PIC X(02).
+          02 WS-TOTLOAN     PIC X(01).
+          02 FILLER         PIC X(16).
+          02 WS-TOTAMT      PIC X(15).
+       PROCEDURE DIVISION.
+       0000-MAIN-PARA.
+            PERFORM 1000-INIT-PARA
+            THRU 1000-INIT-PARA-EXIT.
+            PERFORM 2000-PROC-PARA
+            THRU 2000-PROC-PARA-EXIT.
+            PERFORM 3000-CLOSE-PARA
+            THRU 3000-CLOSE-PARA-EXIT.
+            PERFORM 4000-TERM-PARA
+            THRU 4000-TERM-PARA-EXIT.
+       1000-INIT-PARA.
+           PERFORM 1100-OPEN-PARA
+           THRU 1100-OPEN-PARA-EXIT.
+       1000-INIT-PARA-EXIT.
+       1100-OPEN-PARA.
+           OPEN INPUT APP-KSDS
+           EVALUATE TRUE
+           WHEN WS-FST-APKSDS = 00
+               DISPLAY 'KSDS-AP FILE OPENED'
+           WHEN OTHER
+               DISPLAY 'KSDS-AP FILE NOT OPENED - ' WS-FST-APKSDS
+           END-EVALUATE
+           OPEN OUTPUT OUT-PS
+           EVALUATE TRUE
+           WHEN WS-FST-OUTPS = 00
+               DISPLAY 'RECORD FILE OPENED'
+           WHEN OTHER
+               DISPLAY 'RECORD FILE NOT OPENED - ' WS-FST-OUTPS
+           END-EVALUATE
+           .
+       1100-OPEN-PARA-EXIT.
+       2000-PROC-PARA.
+           PERFORM 2100-MOVE-PARA
+           THRU 2100-MOVE-PARA-EXIT.
+           PERFORM 2300-WRITE-PARA
+           THRU 2300-WRITE-PARA-EXIT.
+           PERFORM 2200-READ-PARA
+           THRU 2200-READ-PARA-EXIT
+           UNTIL WS-FST-APKSDS = 10.
+       2000-PROC-PARA-EXIT.
+       2100-MOVE-PARA.
+           MOVE 'APPLICANTS DETAIL REPORT' TO TITNAME.
+           ACCEPT WS-DATE FROM DATE.
+           ACCEPT WS-TIME FROM TIME.
+           MOVE WS-DATE(1:2) TO WS-YEAR.
+           MOVE WS-DATE(3:2) TO WS-MONTH.
+           MOVE WS-DATE(5:2) TO WS-DAY.
+           MOVE WS-TIME(1:2) TO WS-HR.
+           MOVE WS-TIME(3:2) TO WS-MIN.
+           MOVE WS-TIME(5:2) TO WS-SEC.
+           MOVE '------------------- END OF PAGE --------------------'
+                             TO WS-EOP.
+           MOVE '******************* END OF REPORT ******************'
+                             TO WS-EOF.
+       2100-MOVE-PARA-EXIT.
+       2200-READ-PARA.
+           READ APP-KSDS
+           EVALUATE TRUE
+           WHEN WS-FST-APKSDS = 00
+               ADD 1 TO WS-COUNTER
+               EVALUATE TRUE
+               WHEN WS-COUNTER <= 10
+                   PERFORM 2201-MOVE-PARA
+                   THRU 2201-MOVE-PARA-EXIT
+                   DISPLAY WS-COUNTER
+                   IF WS-COUNTER = 10
+                      MOVE 0 TO WS-COUNTER
+                      DISPLAY 'C' WS-COUNTER
+                      PERFORM 2202-TRAILER-PARA
+                      THRU 2202-TRAILER-PARA-EXIT
+                   END-IF
+               END-EVALUATE
+           WHEN WS-FST-APKSDS = 10
+               PERFORM 2203-EOF-PARA
+               THRU 2203-EOF-PARA-EXIT
+           WHEN OTHER
+              DISPLAY 'ERROR IN READ-' WS-FST-APKSDS
+              PERFORM 4000-TERM-PARA
+              THRU 4000-TERM-PARA
+           END-EVALUATE
+           .
+       2200-READ-PARA-EXIT.
+       2201-MOVE-PARA.
+           MOVE APKSDS-APPID   TO WS-APPID
+           MOVE APKSDS-APPNAME TO WS-NAME
+           MOVE APKSDS-NOOFLN  TO WS-TOTLOAN
+           MOVE APKSDS-LNAMT   TO WS-TOTAMT
+           EVALUATE TRUE
+           WHEN APKSDS-NOOFLN > 1
+               PERFORM 2201S-WRITE-RECORD-PARA
+               THRU 2201S-WRITE-RECORD-PARA-EXIT
+           END-EVALUATE
+           .
+       2201-MOVE-PARA-EXIT.
+       2201S-WRITE-RECORD-PARA.
+           WRITE REPORTPS FROM WS-RECORD
+           .
+       2201S-WRITE-RECORD-PARA-EXIT.
+       2202-TRAILER-PARA.
+           WRITE REPORTPS FROM EMPTY
+           MOVE WS-EOP TO REPORTPS
+           WRITE REPORTPS
+           PERFORM 2202S-NEW-PAGE-PARA
+           THRU 2202S-NEW-PAGE-PARA-EXIT.
+       2202-TRAILER-PARA-EXIT.
+       2202S-NEW-PAGE-PARA.
+           ADD 1 TO WS-NEWPGNUM
+           WRITE REPORTPS FROM EMPTY
+           WRITE REPORTPS FROM EMPTY
+           WRITE REPORTPS FROM WS-NEWPG
+           WRITE REPORTPS FROM WS-NEWREP
+           WRITE REPORTPS FROM EMPTY
+           WRITE REPORTPS FROM FIELDNAME
+           WRITE REPORTPS FROM FIELDUND
+           .
+       2202S-NEW-PAGE-PARA-EXIT.
+       2203-EOF-PARA.
+           WRITE REPORTPS FROM EMPTY
+           MOVE WS-EOF TO REPORTPS
+           WRITE REPORTPS.
+       2203-EOF-PARA-EXIT.
+       2300-WRITE-PARA.
+           WRITE REPORTPS FROM WS-TITLE
+           WRITE REPORTPS FROM EMPTY
+           WRITE REPORTPS FROM DATEPG
+           WRITE REPORTPS FROM TIMEID
+           WRITE REPORTPS FROM EMPTY
+           WRITE REPORTPS FROM EMPTY
+           WRITE REPORTPS FROM FIELDNAME
+           WRITE REPORTPS FROM FIELDUND
+           EVALUATE TRUE
+           WHEN WS-FST-OUTPS = 00
+               DISPLAY 'RECORD FILE WRITEN'
+           WHEN OTHER
+               DISPLAY 'RECORD FILE NOT WRITEN - ' WS-FST-OUTPS
+           END-EVALUATE
+           .
+       2300-WRITE-PARA-EXIT.
+       3000-CLOSE-PARA.
+           CLOSE APP-KSDS
+           EVALUATE TRUE
+           WHEN WS-FST-APKSDS = 00
+               DISPLAY 'KSDS-AP FILE CLOSED'
+           WHEN OTHER
+               DISPLAY 'KSDS-AP FILE NOT CLOSED - ' WS-FST-APKSDS
+           END-EVALUATE
+           CLOSE OUT-PS
+           EVALUATE TRUE
+           WHEN WS-FST-OUTPS = 00
+               DISPLAY 'RECORD FILE CLOSED'
+           WHEN OTHER
+               DISPLAY 'RECORD FILE NOT CLOSED - ' WS-FST-OUTPS
+           END-EVALUATE
+           .
+       3000-CLOSE-PARA-EXIT.
+       4000-TERM-PARA.
+           STOP RUN.
+       4000-TERM-PARA-EXIT.
+

@@ -1,0 +1,313 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID AGRILNC1.
+      ******************************************************************
+      *               AGRICULTURE LOAN PROCESSING SYSTEM
+      *
+      *DATE-WRITTEN      : 27/03/2024.
+      *PROGRAM OBJECTIVE : READING INPUT PS FILE, BACK IT UP TO GDG,
+      *                    VALIDATE THE RECORDS ON PARTICULAR FIELDS,
+      *                    SEND CORRESPONDING VALID RECORDS TO BANK DB
+      *                    AND GENERATE A REPORT WITH VASM AS INPUT.
+      *
+      *INPUT             : TECN194.AGRILN.DETAILS.PS1
+      *OUTPUT-1          : TECN194.AGRILN.ERROR.PS1
+      *OUTPUT-2          : TECN194.AGRILN.VALID.PS1
+      ******************************************************************
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+      * -----> INPUT FILE WHICH CONTAINS INPUT RECORDS <--------------
+           SELECT INP-PS ASSIGN TO AGRLNINP
+           ORGANIZATION IS SEQUENTIAL
+           ACCESS IS SEQUENTIAL
+           FILE STATUS IS WS-FST-INPPS.
+      * -----> ERROR FILE WHICH CONTAINS ERROR RECORDS   <--------------
+           SELECT ERR-PS ASSIGN TO AGRLNERR
+           ORGANIZATION IS SEQUENTIAL
+           ACCESS IS SEQUENTIAL
+           FILE STATUS IS WS-FST-ERRPS.
+      * -----> FILE WHICH CONTAINS VALID RECORDS   <--------------
+           SELECT VALID-PS ASSIGN TO AGRLNVAL
+           ORGANIZATION IS SEQUENTIAL
+           ACCESS IS SEQUENTIAL
+           FILE STATUS IS WS-FST-VALPS.
+       DATA DIVISION.
+       FILE SECTION.
+       FD INP-PS
+           RECORD CONTAINS 330 CHARACTERS.
+       01 INP-PS-REC.
+          02 INP-ID        PIC X(10).
+          02 FILLER        PIC X(1).
+          02 INP-NAME      PIC X(32).
+          02 FILLER        PIC X(1).
+          02 INP-DNO       PIC X(10).
+          02 FILLER        PIC X(1).
+          02 INP-STREET    PIC X(20).
+          02 FILLER        PIC X(1).
+          02 INP-CITY      PIC X(20).
+          02 FILLER        PIC X(1).
+          02 INP-STATE     PIC X(20).
+          02 FILLER        PIC X(1).
+          02 INP-PIN       PIC 9(6).
+          02 FILLER        PIC X(1).
+          02 INP-CELL      PIC X(10).
+          02 FILLER        PIC X(1).
+          02 INP-EMPDET    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 INP-DESIG     PIC X(10).
+          02 FILLER        PIC X(1).
+          02 INP-OFCADDR   PIC X(50).
+          02 FILLER        PIC X(1).
+          02 INP-OFCPHN    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 INP-LNID      PIC X(2).
+          02 FILLER        PIC X(1).
+          02 INP-LNTYPE    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 INP-LNAMT     PIC 9(8).
+          02 FILLER        PIC X(1).
+          02 INP-LNAPRDT   PIC X(10).
+          02 FILLER        PIC X(1).
+          02 INP-LNTNR     PIC X(2).
+          02 FILLER        PIC X(1).
+          02 INP-FIRATE    PIC 99.9.
+          02 FILLER        PIC X(1).
+          02 INP-LNIND     PIC X(5).
+          02 FILLER        PIC X(1).
+          02 INP-REPDATE   PIC X(2).
+          02 FILLER        PIC X(1).
+          02 INP-MORTGAGE  PIC X(50).
+       FD ERR-PS
+           RECORD CONTAINS 330 CHARACTERS.
+       01 ERR-PS-REC.
+          02 ERR-ID        PIC X(10).
+          02 FILLER        PIC X(1).
+          02 ERR-NAME      PIC X(32).
+          02 FILLER        PIC X(1).
+          02 ERR-DNO       PIC X(10).
+          02 FILLER        PIC X(1).
+          02 ERR-STREET    PIC X(20).
+          02 FILLER        PIC X(1).
+          02 ERR-CITY      PIC X(20).
+          02 FILLER        PIC X(1).
+          02 ERR-STATE     PIC X(20).
+          02 FILLER        PIC X(1).
+          02 ERR-PIN       PIC 9(6).
+          02 FILLER        PIC X(1).
+          02 ERR-CELL      PIC X(10).
+          02 FILLER        PIC X(1).
+          02 ERR-EMPDET    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 ERR-DESIG     PIC X(10).
+          02 FILLER        PIC X(1).
+          02 ERR-OFCADDR   PIC X(50).
+          02 FILLER        PIC X(1).
+          02 ERR-OFCPHN    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 ERR-LNID      PIC X(2).
+          02 FILLER        PIC X(1).
+          02 ERR-LNTYPE    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 ERR-LNAMT     PIC 9(8).
+          02 FILLER        PIC X(1).
+          02 ERR-LNAPRDT   PIC X(10).
+          02 FILLER        PIC X(1).
+          02 ERR-LNTNR     PIC X(2).
+          02 FILLER        PIC X(1).
+          02 ERR-FIRATE    PIC 99.9.
+          02 FILLER        PIC X(1).
+          02 ERR-LNIND     PIC X(5).
+          02 FILLER        PIC X(1).
+          02 ERR-REPDATE   PIC X(2).
+          02 FILLER        PIC X(1).
+          02 ERR-MORTGAGE  PIC X(50).
+       FD VALID-PS
+           RECORD CONTAINS 330 CHARACTERS.
+       01 VAL-PS-REC.
+          02 VAL-ID        PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-NAME      PIC X(32).
+          02 FILLER        PIC X(1).
+          02 VAL-DNO       PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-STREET    PIC X(20).
+          02 FILLER        PIC X(1).
+          02 VAL-CITY      PIC X(20).
+          02 FILLER        PIC X(1).
+          02 VAL-STATE     PIC X(20).
+          02 FILLER        PIC X(1).
+          02 VAL-PIN       PIC 9(6).
+          02 FILLER        PIC X(1).
+          02 VAL-CELL      PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-EMPDET    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-DESIG     PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-OFCADDR   PIC X(50).
+          02 FILLER        PIC X(1).
+          02 VAL-OFCPHN    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-LNID      PIC X(2).
+          02 FILLER        PIC X(1).
+          02 VAL-LNTYPE    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-LNAMT     PIC 9(8).
+          02 FILLER        PIC X(1).
+          02 VAL-LNAPRDT   PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-LNTNR     PIC X(2).
+          02 FILLER        PIC X(1).
+          02 VAL-FIRATE    PIC 99.9.
+          02 FILLER        PIC X(1).
+          02 VAL-LNIND     PIC X(5).
+          02 FILLER        PIC X(1).
+          02 VAL-REPDATE   PIC X(2).
+          02 FILLER        PIC X(1).
+          02 VAL-MORTGAGE  PIC X(50).
+       WORKING-STORAGE SECTION.
+       01 WS-FST-INPPS   PIC 9(02) VALUE ZERO.
+       01 WS-FST-ERRPS   PIC 9(02) VALUE ZERO.
+       01 WS-FST-VALPS   PIC 9(02) VALUE ZERO.
+       01 WS-COUNTER     PIC 9(02) VALUE ZERO.
+       PROCEDURE DIVISION.
+       0000-MAIN-PARA.
+           PERFORM 1000-INIT-PARA
+           THRU 1000-INIT-PARA-EXIT.
+           PERFORM 2000-PROC-PARA
+           THRU 2000-PROC-PARA-EXIT.
+           PERFORM 3000-CLOSE-PARA
+           THRU 3000-CLOSE-PARA-EXIT.
+           PERFORM 4000-TERM-PARA
+           THRU 4000-TERM-PARA-EXIT.
+       1000-INIT-PARA.
+           PERFORM 1100-OPEN-PARA
+           THRU 1100-OPEN-PARA-EXIT.
+           EXIT
+           .
+       1000-INIT-PARA-EXIT.
+           EXIT
+           .
+       1100-OPEN-PARA.
+           OPEN INPUT INP-PS
+           EVALUATE TRUE
+           WHEN WS-FST-INPPS = 00
+               DISPLAY 'INPUT FILE OPENED'
+           WHEN OTHER
+               DISPLAY 'INPUT FILE NOT OPENED - ' WS-FST-INPPS
+               PERFORM 4000-TERM-PARA
+               THRU 4000-TERM-PARA-EXIT
+           END-EVALUATE
+           OPEN OUTPUT ERR-PS
+           EVALUATE TRUE
+           WHEN WS-FST-ERRPS = 00
+               DISPLAY 'ERROR FILE OPENED'
+           WHEN OTHER
+               DISPLAY 'ERROR FILE NOT OPENED - ' WS-FST-ERRPS
+               PERFORM 4000-TERM-PARA
+               THRU 4000-TERM-PARA-EXIT
+           END-EVALUATE
+           OPEN OUTPUT VALID-PS
+           EVALUATE TRUE
+           WHEN WS-FST-ERRPS = 00
+               DISPLAY 'ERROR FILE OPENED'
+           WHEN OTHER
+               DISPLAY 'ERROR FILE NOT OPENED - ' WS-FST-ERRPS
+               PERFORM 4000-TERM-PARA
+               THRU 4000-TERM-PARA-EXIT
+           END-EVALUATE
+           .
+       1100-OPEN-PARA-EXIT.
+           EXIT
+           .
+       2000-PROC-PARA.
+           PERFORM 2100-READ-PARA
+           THRU 2100-READ-PARA-EXIT
+           UNTIL WS-FST-INPPS = 10.
+       2000-PROC-PARA-EXIT.
+           EXIT
+           .
+       2100-READ-PARA.
+           READ INP-PS
+           EVALUATE TRUE
+           WHEN WS-FST-INPPS = 00
+             PERFORM 2110-VALID-PARA
+             THRU 2110-VALID-PARA-EXIT
+             ADD 1 TO WS-COUNTER
+           WHEN WS-FST-INPPS = 10
+             EVALUATE TRUE
+             WHEN WS-COUNTER = 00
+                DISPLAY 'FILE IS EMPTY'
+             WHEN OTHER
+                DISPLAY 'ALL RECORDS ARE READ'
+                DISPLAY 'NO-OF RECORDS READ: ' WS-COUNTER
+             END-EVALUATE
+           WHEN OTHER
+             DISPLAY 'ERROR IN FILE READING!!!' WS-FST-INPPS
+           END-EVALUATE
+           .
+       2100-READ-PARA-EXIT.
+       2110-VALID-PARA.
+           EVALUATE TRUE
+           WHEN INP-ID   IS NOT NUMERIC OR
+                INP-NAME NOT GREATER THAN SPACES OR
+                INP-OFCPHN IS NOT NUMERIC OR
+                INP-LNID EQUAL TO SPACES OR
+                INP-LNIND NOT GREATER THAN SPACES
+                PERFORM 2111-MOVE-ERR-PARA
+                THRU 2111-MOVE-ERR-PARA-EXIT
+           WHEN OTHER
+                PERFORM 2113-MOVE-VALID-PARA
+                THRU 2113-MOVE-VALID-PARA-EXIT
+           END-EVALUATE
+           .
+       2110-VALID-PARA-EXIT.
+           EXIT
+           .
+       2111-MOVE-ERR-PARA.
+           MOVE INP-PS-REC TO ERR-PS-REC
+           PERFORM 2112-ERROR-WRITE-PARA
+           THRU 2112-ERROR-WRITE-PARA-EXIT.
+       2111-MOVE-ERR-PARA-EXIT.
+           EXIT
+           .
+       2112-ERROR-WRITE-PARA.
+            WRITE ERR-PS-REC
+            EVALUATE TRUE
+            WHEN WS-FST-ERRPS = 00
+               DISPLAY 'FILE WRITTEN'
+            WHEN OTHER
+               DISPLAY 'ERROR IN FILE' WS-FST-ERRPS
+            END-EVALUATE
+            .
+       2112-ERROR-WRITE-PARA-EXIT.
+           EXIT
+           .
+       2113-MOVE-VALID-PARA.
+           MOVE INP-PS-REC TO VAL-PS-REC
+           PERFORM 2114-VALID-WRITE-PARA
+           THRU 2114-VALID-WRITE-PARA-EXIT.
+       2113-MOVE-VALID-PARA-EXIT.
+       2114-VALID-WRITE-PARA.
+            WRITE VAL-PS-REC
+            EVALUATE TRUE
+            WHEN WS-FST-VALPS = 00
+               DISPLAY 'FILE WRITTEN'
+            WHEN OTHER
+               DISPLAY 'ERROR IN FILE' WS-FST-VALPS
+            END-EVALUATE
+            .
+       2114-VALID-WRITE-PARA-EXIT.
+       3000-CLOSE-PARA.
+            CLOSE INP-PS.
+            CLOSE ERR-PS.
+            CLOSE VALID-PS.
+       3000-CLOSE-PARA-EXIT.
+           EXIT
+           .
+       4000-TERM-PARA.
+           STOP RUN.
+       4000-TERM-PARA-EXIT.
+           EXIT
+           .
+

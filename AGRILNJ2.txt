@@ -1,0 +1,35 @@
+//TECN194A JOB 'TECN194','VARUN',MSGLEVEL=(1,1),
+//            CLASS=A,MSGCLASS=A,NOTIFY=&SYSUID
+//**********************************************************************
+//*                    PRE-DELETE
+//**********************************************************************
+//STEP01   EXEC PGM=IEFBR14
+//DD1      DD DSN=TECN194.AGRILN.ERROR.PS1,
+//            DISP=(MOD,DELETE,DELETE),
+//            SPACE=(TRK,(0))
+//DD2      DD DSN=TECN194.AGRILN.VALID.PS1,
+//            DISP=(MOD,DELETE,DELETE),
+//            SPACE=(TRK,(0))
+//**********************************************************************
+//*           CREATION OF ERROR AND VALID FILE
+//**********************************************************************
+//STEP02   EXEC PGM=IEFBR14
+//DD1      DD DSN=TECN194.AGRILN.ERROR.PS1,
+//            DISP=(NEW,CATLG,DELETE),
+//            SPACE=(TRK,(1,1)),
+//            DCB=(RECFM=FB,LRECL=330)
+//DD2      DD DSN=TECN194.AGRILN.VALID.PS1,
+//            DISP=(NEW,CATLG,DELETE),
+//            SPACE=(TRK,(1,1)),
+//            DCB=(RECFM=FB,LRECL=330)
+//**********************************************************************
+//*             RUN JCL FOR AGRILNC1(VALIDATIONS)
+//**********************************************************************
+//AGRILNC1 EXEC PGM=AGRILNC1
+//STEPLIB  DD DSN=TECN194.COBOL.LOADLIB,DISP=SHR
+//AGRLNINP DD DSN=TECN194.AGRILN.DETAILS.PS1,DISP=SHR
+//AGRLNERR DD DSN=TECN194.AGRILN.ERROR.PS1,DISP=OLD
+//AGRLNVAL DD DSN=TECN194.AGRILN.VALID.PS1,DISP=OLD
+//SYSPRINT DD SYSOUT=*
+//SYSIN    DD DUMMY
+

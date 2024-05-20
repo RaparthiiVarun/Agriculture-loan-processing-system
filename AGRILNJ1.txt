@@ -1,0 +1,15 @@
+//TECN194A JOB 'TECN194','VARUN',MSGLEVEL=(1,1),
+//            CLASS=A,MSGCLASS=A,NOTIFY=&SYSUID
+//**********************************************************************
+//*             JCL TO TAKE BACKUP OF BANK INP FILE
+//**********************************************************************
+//STEP01   EXEC PGM=IEBGENER
+//SYSUT1   DD DSN=TECN194.AGRILN.DETAILS.PS1,DISP=SHR
+//SYSUT2   DD DSN=TECN194.AGRI.BACKUP.GDG(+1),
+//            DISP=(NEW,CATLG,DELETE),
+//            SPACE=(TRK,(1,1)),
+//            DCB=(RECFM=FB,LRECL=330)
+//SYSIN    DD DUMMY
+//SYSPRINT DD SYSOUT=*
+//SYSOUT   DD SYSOUT=*
+

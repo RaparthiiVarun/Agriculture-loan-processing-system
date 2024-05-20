@@ -1,0 +1,12 @@
+//TECN194A JOB 'TECN194','VARUN',MSGLEVEL=(1,1),
+//            CLASS=A,MSGCLASS=A,NOTIFY=&SYSUID
+//**********************************************************************
+//*        RUN JCL OF AGRILNC3(REPORT CREATION COBOL PGM)
+//**********************************************************************
+//STEP01   EXEC PGM=AGRILNC3
+//STEPLIB  DD DSN=TECN194.COBOL.LOADLIB,DISP=SHR
+//SYSPRINT DD SYSOUT=*
+//APPKSDS  DD DSN=TECN194.AGRIAP.DETAILS.KSDS,DISP=SHR
+//AGRLNREP DD DSN=TECN194.AGRILN.DETAILS.REPORT,DISP=OLD
+//SYSIN    DD DUMMY
+

@@ -1,0 +1,469 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID AGRILNC2.
+      ******************************************************************
+      *               AGRICULTURE LOAN PROCESSING SYSTEM
+      *
+      *DATE-WRITTEN      : 27/03/2024.
+      *PROGRAM OBJECTIVE : READING INPUT PS FILE, BACK IT UP TO GDG,
+      *                    VALIDATE THE RECORDS ON PARTICULAR FIELDS,
+      *                    SEND CORRESPONDING VALID RECORDS TO BANK DB
+      *                    AND GENERATE A REPORT WITH VASM AS INPUT.
+      *
+      *INPUT             : TECN194.AGRILN.VALID.PS1
+      *OUTPUT FILE 1     : TECN194.AGRIAP.DETAILS.KSDS
+      ******************************************************************
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+      * -----> FILE WHICH CONTAINS VALID RECORDS   <--------------
+           SELECT VALID-PS ASSIGN TO AGRLNVAL
+           ORGANIZATION IS SEQUENTIAL
+           ACCESS IS SEQUENTIAL
+           FILE STATUS IS WS-FST-VALPS.
+      * -----> KSDS FILE WHICH CONTAINS APPLICANT DET   <--------------
+           SELECT APP-KSDS ASSIGN TO APPKSDS
+           ORGANIZATION IS INDEXED
+           ACCESS IS RANDOM
+           RECORD KEY IS APKSDS-APPID
+           FILE STATUS IS WS-FST-APKSDS.
+       DATA DIVISION.
+       FILE SECTION.
+       FD VALID-PS
+           RECORD CONTAINS 330 CHARACTERS.
+       01 VAL-PS-REC.
+          02 VAL-ID        PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-NAME      PIC X(32).
+          02 FILLER        PIC X(1).
+          02 VAL-DNO       PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-STREET    PIC X(20).
+          02 FILLER        PIC X(1).
+          02 VAL-CITY      PIC X(20).
+          02 FILLER        PIC X(1).
+          02 VAL-STATE     PIC X(20).
+          02 FILLER        PIC X(1).
+          02 VAL-PIN       PIC 9(6).
+          02 FILLER        PIC X(1).
+          02 VAL-CELL      PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-EMPDET    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-DESIG     PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-OFCADDR   PIC X(50).
+          02 FILLER        PIC X(1).
+          02 VAL-OFCPHN    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-LNID      PIC X(2).
+          02 FILLER        PIC X(1).
+          02 VAL-LNTYPE    PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-LNAMT     PIC 9(8).
+          02 FILLER        PIC X(1).
+          02 VAL-LNAPRDT   PIC X(10).
+          02 FILLER        PIC X(1).
+          02 VAL-LNTNR     PIC X(2).
+          02 FILLER        PIC X(1).
+          02 VAL-FIRATE    PIC 99.9.
+          02 FILLER        PIC X(1).
+          02 VAL-LNIND     PIC X(5).
+          02 FILLER        PIC X(1).
+          02 VAL-REPDATE   PIC X(2).
+          02 FILLER        PIC X(1).
+          02 VAL-MORTGAGE  PIC X(50).
+       FD APP-KSDS
+           RECORD CONTAINS 80 CHARACTERS.
+       01 AP-KSDS-REC.
+          02 APKSDS-APPID   PIC X(10).
+          02 FILLER         PIC X(1).
+          02 APKSDS-APPNAME PIC X(32).
+          02 FILLER         PIC X(1).
+          02 APKSDS-CELL    PIC X(10).
+          02 FILLER         PIC X(1).
+          02 APKSDS-NOOFLN  PIC 9(01).
+          02 FILLER         PIC X(1).
+          02 APKSDS-LNAMT   PIC 9(07)V99.
+          02 FILLER         PIC X(1).
+          02 APKSDS-LNAPDT  PIC X(10).
+       WORKING-STORAGE SECTION.
+           EXEC SQL
+             INCLUDE SQLCA
+           END-EXEC.
+           EXEC SQL
+             INCLUDE APPLICNT
+           END-EXEC.
+           EXEC SQL
+             INCLUDE LOAN
+           END-EXEC.
+           EXEC SQL
+                 DECLARE CUR1 CURSOR
+                 FOR SELECT MAX(A.APPLICANT_ID),A.APPLICANT_NAME,
+                     COUNT(*),SUM(L.APP_LNAMT),MAX(CELL_PHN_NO),
+                     MAX(LOAN_APPDT)
+                 FROM LOAN L FULL JOIN APPLICANT A
+                 ON L.APPLICANT_ID=A.APPLICANT_ID
+                 WHERE LOAN_IND = 'OPEN'
+                 GROUP BY APPLICANT_NAME
+                 ORDER BY MAX(A.APPLICANT_ID)
+           END-EXEC.
+       01 WS-SQLCODE     PIC -ZZ9.
+       01 WS-APPID       PIC X(10).
+       01 WS-COUNT       PIC 9(02).
+       01 WS-SUM         PIC 9(10).
+       01 WS-FST-VALPS   PIC 9(02).
+       01 WS-FST-APKSDS  PIC 9(02).
+       01 WS-LOANID      PIC ZZ99.
+       01 WS-COUNTER     PIC 9(02) VALUE ZERO.
+       01 WS-TOTREPAMT   PIC 9(09) VALUE ZERO.
+       01 WS-MNTHREP     PIC 9(07)V99 VALUE ZERO.
+       01 WS-FIRATE      PIC 99V9 VALUE ZERO.
+       01 WS-LNTNR       PIC 99 VALUE ZERO.
+       01 WS-DATE        PIC 9(08) VALUE ZERO.
+       01 WS-INTDATE     PIC 9(10) VALUE ZERO.
+       01 WS-REPAYDATE   PIC 9(08) VALUE ZERO.
+       01 WS-VARS.
+           05 WS-ERR-MSG.
+              10 WS-ERR-LEN PIC S9(04) COMP VALUE 800.
+              10 WS-ERR-TXT PIC X(80) OCCURS 10 TIMES.
+           05 WS-LRECL PIC S9(09) COMP VALUE 80.
+       01 WSHV-APPLICANT-ID        PIC X(10).
+       01 WSHV-APPLICANT-NAME-TEXT PIC X(32).
+       01 WSLOAN-ID                PIC 9(02).
+       01 WSLOAN-TYPE              PIC X(10).
+       01 WSHV-CELL-PHN-NO         PIC X(10).
+       01 WSLOAN-APPDT             PIC X(10).
+       01 REP-DATE.
+         02 REP-YEAR        PIC 9(04).
+         02 FILLER          PIC X(01) VALUE '-'.
+         02 REP-MONTH       PIC 9(02).
+         02 FILLER          PIC X(01) VALUE '-'.
+         02 REP-DAY         PIC 9(02).
+       PROCEDURE DIVISION.
+       0000-MAIN-PARA.
+           PERFORM 1000-INIT-PARA
+              THRU 1000-INIT-PARA-EXIT
+           PERFORM 2000-PROC-PARA
+              THRU 2000-PROC-PARA-EXIT
+           PERFORM 3000-TERM-PARA
+              THRU 3000-TERM-PARA-EXIT
+           .
+       1000-INIT-PARA.
+           PERFORM 1100-OPEN-PARA
+              THRU 1100-OPEN-PARA-EXIT
+           PERFORM 1200-MOVE-PARA
+              THRU 1200-MOVE-PARA-EXIT
+           PERFORM 1300-PRE-DEL-DB
+              THRU 1300-PRE-DEL-DB-EXIT
+           .
+       1000-INIT-PARA-EXIT.
+           EXIT
+           .
+       1100-OPEN-PARA.
+           OPEN INPUT VALID-PS
+           EVALUATE TRUE
+           WHEN WS-FST-VALPS = 00
+               DISPLAY 'INPUT FILE OPENED'
+           WHEN OTHER
+               DISPLAY 'INPUT FILE NOT OPENED - ' WS-FST-VALPS
+               PERFORM 3000-TERM-PARA
+               THRU 3000-TERM-PARA-EXIT
+           END-EVALUATE
+           OPEN OUTPUT APP-KSDS
+           EVALUATE TRUE
+           WHEN WS-FST-APKSDS = 00
+               DISPLAY 'KSDS-AP FILE OPENED'
+           WHEN OTHER
+               DISPLAY 'KSDS-AP FILE NOT OPENED - ' WS-FST-APKSDS
+           END-EVALUATE
+           EXEC SQL
+             OPEN CUR1
+           END-EXEC
+           .
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+               DISPLAY 'CURSOR OPEN SUCCESS'
+           WHEN OTHER
+               DISPLAY 'CURSOR OPEN FAILED ' SQLCODE
+           END-EVALUATE
+           .
+       1100-OPEN-PARA-EXIT.
+           EXIT
+           .
+       1200-MOVE-PARA.
+           MOVE SPACES TO AP-KSDS-REC
+           .
+       1200-MOVE-PARA-EXIT.
+           EXIT
+           .
+      *------------> PRE-DELETION OF RECORDS IN DB <-------------------
+       1300-PRE-DEL-DB.
+           EXEC SQL
+               DELETE FROM APPLICANT
+           END-EXEC.
+           EXEC SQL
+               DELETE FROM LOAN
+           END-EXEC.
+       1300-PRE-DEL-DB-EXIT.
+           EXIT
+           .
+       2000-PROC-PARA.
+           PERFORM 2100-READ-PARA
+              THRU 2100-READ-PARA-EXIT
+              UNTIL WS-FST-VALPS = 10
+           PERFORM 2100-FETCH-PARA
+              THRU 2100-FETCH-PARA-EXIT
+              UNTIL SQLCODE = 100
+           PERFORM 2200-CLOSE-PARA
+              THRU 2200-CLOSE-PARA-EXIT
+           .
+       2000-PROC-PARA-EXIT.
+           EXIT
+           .
+       2100-READ-PARA.
+           READ VALID-PS
+           EVALUATE TRUE
+           WHEN WS-FST-VALPS = 00
+             PERFORM 2200-LOADAP-PARA
+             THRU 2200-LOADAP-PARA-EXIT
+             PERFORM 2300-LOADLN-PARA
+             THRU 2300-LOADLN-PARA-EXIT
+             ADD 1 TO WS-COUNTER
+           WHEN WS-FST-VALPS = 10
+             EVALUATE TRUE
+             WHEN WS-COUNTER = 00
+                DISPLAY 'FILE IS EMPTY'
+             WHEN OTHER
+                DISPLAY 'ALL RECORDS ARE READ'
+                DISPLAY 'NO-OF RECORDS READ: ' WS-COUNTER
+             END-EVALUATE
+           WHEN OTHER
+             DISPLAY 'ERROR IN FILE READING!!!' WS-FST-VALPS
+           END-EVALUATE
+           .
+       2100-READ-PARA-EXIT.
+           EXIT
+           .
+       2200-LOADAP-PARA.
+           PERFORM 2210-MOVEAP-PARA
+           THRU 2210-MOVEAP-PARA-EXIT
+           EXEC SQL
+           INSERT INTO APPLICANT
+           (
+                  APPLICANT_ID,
+                  APPLICANT_NAME,
+                  DOOR_NO,
+                  STREET,
+                  CITY,
+                  STATE,
+                  PIN,
+                  CELL_PHN_NO,
+                  EMP_DETAILS,
+                  DESIGNATION,
+                  OFC_ADR,
+                  OFC_PHN_NO
+           )
+           VALUES
+           (
+           :HV-APPLICANT-ID,
+           :HV-APPLICANT-NAME,
+           :HV-DOOR-NO,
+           :HV-STREET,
+           :HV-CITY,
+           :HV-STATE,
+           :HV-PIN,
+           :HV-CELL-PHN-NO,
+           :HV-EMP-DETAILS,
+           :HV-DESIGNATION,
+           :HV-OFC-ADR,
+           :HV-OFC-PHN-NO
+           )
+           END-EXEC.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+              CONTINUE
+           WHEN OTHER
+              MOVE SQLCODE TO WS-SQLCODE
+              DISPLAY 'APP-INSERTION FAILED' WS-SQLCODE
+              CALL 'DSNTIAR' USING SQLCA WS-ERR-MSG WS-LRECL
+              DISPLAY WS-ERR-MSG
+              MOVE 12 TO RETURN-CODE
+           END-EVALUATE
+           .
+       2200-LOADAP-PARA-EXIT.
+           EXIT
+           .
+       2210-MOVEAP-PARA.
+           MOVE VAL-ID      TO HV-APPLICANT-ID.
+           MOVE VAL-NAME    TO HV-APPLICANT-NAME-TEXT.
+           MOVE LENGTH OF VAL-NAME TO HV-APPLICANT-NAME-LEN.
+           MOVE VAL-DNO     TO HV-DOOR-NO.
+           DISPLAY VAL-DNO ' ' HV-DOOR-NO.
+           MOVE VAL-STREET  TO HV-STREET.
+           MOVE VAL-CITY    TO HV-CITY.
+           MOVE VAL-STATE   TO HV-STATE.
+           MOVE VAL-PIN     TO HV-PIN.
+           MOVE VAL-CELL    TO HV-CELL-PHN-NO.
+           MOVE VAL-EMPDET  TO HV-EMP-DETAILS.
+           MOVE VAL-DESIG   TO HV-DESIGNATION.
+           MOVE VAL-OFCADDR TO HV-OFC-ADR-TEXT.
+           MOVE LENGTH OF VAL-OFCADDR TO HV-OFC-ADR-LEN.
+           MOVE VAL-OFCPHN  TO HV-OFC-PHN-NO.
+       2210-MOVEAP-PARA-EXIT.
+           EXIT
+           .
+       2300-LOADLN-PARA.
+           PERFORM 2310-MOVELN-PARA
+           THRU 2310-MOVELN-PARA-EXIT.
+           EXEC SQL
+           INSERT INTO LOAN
+           (
+                  APPLICANT_ID,
+                  LOAN_ID,
+                  LOAN_TYPE,
+                  APP_LNAMT,
+                  LOAN_APPDT,
+                  LOAN_TENURE,
+                  FIXED_INTRATE,
+                  LOAN_IND,
+                  REPAYMENT_DAY,
+                  TOT_REPAYAMT,
+                  MONTHLY_REPAY,
+                  NXT_REPAY_DUEDT,
+                  BALANCE_AMT,
+                  MORTGAGE_DET
+           )
+           VALUES
+           (
+           :APPLICANT-ID,
+           :LOAN-ID,
+           :LOAN-TYPE,
+           :APP-LNAMT,
+           :LOAN-APPDT,
+           :LOAN-TENURE,
+           :FIXED-INTRATE,
+           :LOAN-IND,
+           :REPAYMENT-DAY,
+           :TOT-REPAYAMT,
+           :MONTHLY-REPAY,
+           :NXT-REPAY-DUEDT,
+           :BALANCE-AMT,
+           :MORTGAGE-DET
+           )
+           END-EXEC.
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+              CONTINUE
+           WHEN OTHER
+              MOVE SQLCODE TO WS-SQLCODE
+              DISPLAY 'LN-INSERTION FAILED' WS-SQLCODE
+              CALL 'DSNTIAR' USING SQLCA WS-ERR-MSG WS-LRECL
+              DISPLAY WS-ERR-MSG
+              MOVE 12 TO RETURN-CODE
+           END-EVALUATE
+           .
+       2300-LOADLN-PARA-EXIT.
+           EXIT
+           .
+       2310-MOVELN-PARA.
+           MOVE VAL-ID      TO APPLICANT-ID
+           MOVE VAL-LNID    TO LOAN-ID
+           MOVE VAL-LNTYPE  TO LOAN-TYPE
+           MOVE VAL-LNAMT   TO APP-LNAMT
+           MOVE VAL-LNAPRDT TO LOAN-APPDT
+           MOVE VAL-LNTNR   TO WS-LNTNR
+           MOVE WS-LNTNR    TO LOAN-TENURE
+           MOVE VAL-FIRATE  TO WS-FIRATE
+           MOVE WS-FIRATE   TO FIXED-INTRATE
+           MOVE VAL-LNIND   TO LOAN-IND
+           COMPUTE WS-TOTREPAMT = VAL-LNAMT + (VAL-LNAMT * WS-LNTNR *
+                                    (WS-FIRATE / 100))
+           MOVE WS-TOTREPAMT TO TOT-REPAYAMT
+           COMPUTE WS-MNTHREP = WS-TOTREPAMT / (WS-LNTNR * 12)
+           MOVE WS-MNTHREP   TO MONTHLY-REPAY
+           MOVE VAL-REPDATE  TO VAL-LNAPRDT(9:2)
+           MOVE VAL-LNAPRDT(1:4)  TO WS-DATE(1:4)
+           MOVE VAL-LNAPRDT(6:2)  TO WS-DATE(5:2)
+           MOVE VAL-LNAPRDT(9:2)  TO WS-DATE(7:2)
+           COMPUTE WS-INTDATE = FUNCTION INTEGER-OF-DATE(WS-DATE) + 31
+           COMPUTE WS-REPAYDATE = FUNCTION DATE-OF-INTEGER(WS-INTDATE)
+           MOVE WS-REPAYDATE(1:4) TO VAL-LNAPRDT(1:4)
+           MOVE WS-REPAYDATE(5:2) TO VAL-LNAPRDT(6:2)
+           MOVE WS-REPAYDATE(7:2) TO VAL-LNAPRDT(9:2)
+           MOVE VAL-LNAPRDT       TO NXT-REPAY-DUEDT
+           MOVE WS-TOTREPAMT TO BALANCE-AMT
+           MOVE VAL-MORTGAGE TO MORTGAGE-DET
+           .
+       2310-MOVELN-PARA-EXIT.
+           EXIT
+           .
+       2100-FETCH-PARA.
+           EXEC SQL
+             FETCH CUR1
+             INTO :HV-APPLICANT-ID,
+                  :HV-APPLICANT-NAME,
+                  :HV-PIN,
+                  :APP-LNAMT,
+                  :HV-CELL-PHN-NO,
+                  :LOAN-APPDT
+           END-EXEC
+           .
+           EVALUATE TRUE
+           WHEN SQLCODE = 0
+               PERFORM 2310-MOVEAP-PARA
+                  THRU 2310-MOVEAP-PARA-EXIT
+               ADD 1 TO WS-COUNTER
+           WHEN SQLCODE = 100
+               DISPLAY 'ALL ROWS FETCHED'
+               DISPLAY 'TOTAL RECS:' WS-COUNTER
+           WHEN OTHER
+               DISPLAY 'FETCH FAILED' SQLCODE
+           END-EVALUATE
+           .
+       2100-FETCH-PARA-EXIT.
+           EXIT
+           .
+       2310-MOVEAP-PARA.
+           MOVE HV-APPLICANT-ID        TO  APKSDS-APPID
+           MOVE HV-APPLICANT-NAME-TEXT TO  APKSDS-APPNAME
+           MOVE HV-CELL-PHN-NO         TO  APKSDS-CELL
+           MOVE LOAN-APPDT             TO  APKSDS-LNAPDT
+           MOVE HV-PIN                 TO  APKSDS-NOOFLN
+           MOVE APP-LNAMT              TO  APKSDS-LNAMT
+           MOVE HV-CELL-PHN-NO         TO  APKSDS-CELL
+           MOVE LOAN-APPDT             TO  WSLOAN-APPDT
+           EVALUATE TRUE
+           WHEN LOAN-IND = 'OPEN '
+                PERFORM 2211-WRITE-KSDS-PARA
+                THRU 2211-WRITE-KSDS-PARA-EXIT
+           END-EVALUATE
+           .
+       2310-MOVEAP-PARA-EXIT.
+           EXIT
+           .
+       2211-WRITE-KSDS-PARA.
+            WRITE AP-KSDS-REC
+            EVALUATE TRUE
+            WHEN WS-FST-APKSDS = 00
+               CONTINUE
+            WHEN OTHER
+               DISPLAY 'AP-KSDS ERROR IN FILE'
+            END-EVALUATE
+            .
+       2211-WRITE-KSDS-PARA-EXIT.
+       2200-CLOSE-PARA.
+           EXEC SQL
+             CLOSE CUR1
+           END-EXEC
+           .
+           CLOSE APP-KSDS
+           .
+       2200-CLOSE-PARA-EXIT.
+           EXIT
+           .
+       3000-TERM-PARA.
+           STOP RUN.
+       3000-TERM-PARA-EXIT.
+           EXIT
+           .
+
